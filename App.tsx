@@ -34,9 +34,13 @@ const hashString = (str: string): number => {
     return hash;
 };
 
-// This hook is now safe because the component using it (`App`) ensures it only runs on the client.
+// This hook is now SSR-safe.
 const useStickyState = <T,>(defaultValue: T, key: string) => {
     const [value, setValue] = useState<T>(() => {
+        // Prevent SSR errors by checking for 'window'
+        if (typeof window === 'undefined') {
+            return defaultValue;
+        }
         try {
             const stickyValue = window.localStorage.getItem(key);
             if (stickyValue !== null) {
@@ -49,6 +53,7 @@ const useStickyState = <T,>(defaultValue: T, key: string) => {
     });
 
     useEffect(() => {
+        // This effect runs only on the client where localStorage is available.
         try {
             window.localStorage.setItem(key, JSON.stringify(value));
         } catch (error) {
@@ -203,12 +208,6 @@ const DashboardPage = ({ user, onLogout, users, files, announcements, onAddUser,
 
 // --- Main App Component ---
 const App = () => {
-    const [isClient, setIsClient] = useState(false);
-    
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
     const [view, setView] = useState('landing');
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     
@@ -292,11 +291,6 @@ const App = () => {
     
     // Derived state for current user's files
     const userFiles = files.filter(f => f.owner === currentUser?.username);
-
-    // Prevent rendering on the server or before client-side hydration
-    if (!isClient) {
-        return null;
-    }
 
     if (view === 'login') {
         return <AuthForm title="تسجيل الدخول" buttonText="دخول" onSubmit={handleLogin} setView={setView} switchView="register" switchText="ليس لديك حساب؟" />;
